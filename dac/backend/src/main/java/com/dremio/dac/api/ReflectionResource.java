@@ -72,7 +72,7 @@ public class ReflectionResource {
 
     return new Reflection(goal.get(), reflectionServiceHelper.getStatusForReflection(reflectionId), reflectionServiceHelper.getCurrentSize(reflectionId), reflectionServiceHelper.getTotalSize(reflectionId));
   }
-
+  // post 方法，创建一个反射
   @POST
   public Reflection createReflection(Reflection reflection) {
     // TODO: handle exceptions

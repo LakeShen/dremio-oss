@@ -91,6 +91,7 @@ import io.netty.util.internal.OutOfDirectMemoryError;
  *   messages are sent to running fragments to terminate
  * - when all fragments complete, state change messages drive the state to COMPLETED
  */
+// 一次语句的执行
 public class AttemptManager implements Runnable {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AttemptManager.class);
   private static final ControlsInjector injector = ControlsInjectorFactory.getInjector(AttemptManager.class);
@@ -340,8 +341,9 @@ public class AttemptManager implements Runnable {
       observer.beginState(AttemptObserver.toEvent(AttemptEvent.State.PENDING));
 
       observer.queryStarted(queryRequest, queryContext.getSession().getCredentials().getUserName());
-
+      // 规则集引擎？
       String ruleSetEngine = ruleBasedEngineSelector.resolveAndUpdateEngine(queryContext);
+
       ResourceSchedulingProperties resourceSchedulingProperties = new ResourceSchedulingProperties();
       resourceSchedulingProperties.setRoutingEngine(queryContext.getSession().getRoutingEngine());
       resourceSchedulingProperties.setRuleSetEngine(ruleSetEngine);
@@ -357,7 +359,7 @@ public class AttemptManager implements Runnable {
           injector.injectPause(queryContext.getExecutionControls(), INJECTOR_PENDING_PAUSE, logger);
           injector.injectChecked(queryContext.getExecutionControls(), INJECTOR_PENDING_ERROR,
             ForemanException.class);
-
+          // sql 的解析，验证，转成 relnode
           plan();
           injector.injectPause(queryContext.getExecutionControls(), INJECTOR_PLAN_PAUSE, logger);
           injector.injectChecked(queryContext.getExecutionControls(), INJECTOR_PLAN_ERROR,
@@ -365,7 +367,7 @@ public class AttemptManager implements Runnable {
           return null;
         }, runInSameThread).get();
 
-
+      // 异步 Query
       if (command.getCommandType() == CommandType.ASYNC_QUERY) {
         AsyncCommand asyncCommand = (AsyncCommand) command;
         committer = asyncCommand.getPhysicalPlan().getCommitter();
@@ -446,6 +448,8 @@ public class AttemptManager implements Runnable {
     observer.beginState(AttemptObserver.toEvent(AttemptEvent.State.METADATA_RETRIEVAL));
 
     CommandCreator creator = newCommandCreator(queryContext, observer, prepareId);
+    // 一条 sql 底层翻译成 CommandRunner 来运行
+    // CommandRunner
     command = creator.toCommand();
     logger.debug("Using command: {}.", command);
 
@@ -456,7 +460,10 @@ public class AttemptManager implements Runnable {
         Preconditions.checkState(command instanceof AsyncCommand, "Asynchronous query must be an AsyncCommand");
         command.plan();
         break;
-
+      // 都在协调器上运行，Master Coordinator
+      // 作业的运行和解雇的查询居然是解耦了
+      // 用户提交一个 sql 运行，然后根据任务返回的 job id ，查询状态和结果。
+      // https://docs.dremio.com/rest-api/sql/post-sql/
       case SYNC_QUERY:
       case SYNC_RESPONSE:
         moveToState(QueryState.STARTING, null);

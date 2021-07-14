@@ -57,8 +57,9 @@ public class RefreshStartHandler {
   }
 
   public JobId startJob(ReflectionEntry entry, long jobSubmissionTime, OptionManager optionManager) {
+    // 放射 ID
     ReflectionId reflectionId = entry.getId();
-
+    // 物化 ID
     final MaterializationId id = new MaterializationId(UUID.randomUUID().toString());
     logger.debug("starting refresh for materialization {}/{}", reflectionId.getId(), id.getId());
     boolean icebergDataset = isIcebergDataset(optionManager);

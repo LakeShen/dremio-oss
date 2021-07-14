@@ -150,15 +150,17 @@ public class CommandCreator {
 
   public CommandRunner<?> toCommand() throws ForemanException {
       injector.injectChecked(context.getExecutionControls(), "run-try-beginning", ForemanException.class);
+      // 根据请求来具体执行
       switch(request.getType()){
+        // 查询 catalog
       case GET_CATALOGS:
         return new MetadataProvider.CatalogsProvider(dbContext.getInformationSchemaServiceBlockingStub(),
           getParameters(context.getSession(), context.getQueryId()), request.unwrap(GetCatalogsReq.class));
-
+      // 获取 schema
       case GET_SCHEMAS:
         return new MetadataProvider.SchemasProvider(dbContext.getInformationSchemaServiceBlockingStub(),
           getParameters(context.getSession(), context.getQueryId()), request.unwrap(GetSchemasReq.class));
-
+      // 获取表
       case GET_TABLES:
         return new MetadataProvider.TablesProvider(dbContext.getInformationSchemaServiceBlockingStub(),
           getParameters(context.getSession(), context.getQueryId()), request.unwrap(GetTablesReq.class));
@@ -181,7 +183,7 @@ public class CommandCreator {
       case GET_SERVER_META:
         return new ServerMetaProvider.ServerMetaCommandRunner(context.getQueryId(), context.getSession(), dbContext,
           request.unwrap(GetServerMetaReq.class));
-
+      // 运行 SQL
       case RUN_QUERY:
         final RunQuery query = request.unwrap(RunQuery.class);
 
@@ -227,8 +229,9 @@ public class CommandCreator {
                 "It is likely that the client failed to handle this message.")
               .build(logger);
           }
-
+        // 如果是 SQL
         case SQL:
+          // 翻译为 CommandRunner
           return getSqlCommand(query.getPlan(), PrepareMetadataType.NONE);
 
         case PHYSICAL: // should be deprecated once tests are removed.
@@ -261,6 +264,7 @@ public class CommandCreator {
   @VisibleForTesting
   CommandRunner<?> getSqlCommand(String sql, PrepareMetadataType prepareMetadataType) {
     try{
+      // calcite 解析器
       final SqlConverter parser = new SqlConverter(
           context.getPlannerSettings(),
           context.getOperatorTable(),
@@ -277,12 +281,14 @@ public class CommandCreator {
       injector.injectChecked(context.getExecutionControls(), "sql-parsing", ForemanSetupException.class);
       final DremioCatalogReader reader = parser.getCatalogReader();
       final Catalog catalog = context.getCatalog();
+      // 解析 sql，形成 SQlNode (AST)
       final SqlNode sqlNode = parser.parse(sql);
       final SqlHandlerConfig config = new SqlHandlerConfig(context, parser, observer, parser.getMaterializations());
-
+      // 验证
       validateCommand(sqlNode);
-
+      // 同步 CommandRunner?
       final DirectBuilder direct = new DirectBuilder(sql, sqlNode, prepareMetadataType);
+      // 异步 CommandRunner
       final AsyncBuilder async = new AsyncBuilder(sql, sqlNode, prepareMetadataType);
 
       //TODO DX-10976 refactor all handlers to use similar Creator interfaces
@@ -342,6 +348,7 @@ public class CommandCreator {
           return direct.create(new ShowTablesHandler(catalog));
         } else if (sqlNode instanceof SqlUseSchema) {
           return direct.create(new UseSchemaHandler(context.getSession(), catalog));
+          // SQL 语句中创建数据反射
         } else if (sqlNode instanceof SqlCreateReflection) {
           return direct.create(new AccelCreateReflectionHandler(catalog, context.getAccelerationManager(), getReflectionContext(), context.getOptions().getOption(PlannerSettings.FULL_NESTED_SCHEMA_SUPPORT)));
         } else if (sqlNode instanceof SqlAddExternalReflection) {

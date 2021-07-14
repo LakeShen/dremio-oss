@@ -20,16 +20,19 @@ public interface CommandRunner<T> {
   enum CommandType {
     /**
      * A command that runs on the coordination node and returns a response via a custom rpc message.
+     * 在协调节点上运行的命令，并通过自定义rpc消息返回响应。
      */
     SYNC_RESPONSE,
 
     /**
      * A command that runs on the coordination node and returns a response via query data and result.
+     * 在协调节点上运行的命令，通过查询数据和结果返回响应。
      */
     SYNC_QUERY,
 
     /**
      * A command that runs on one or more execution nodes and returns response via query data and result.
+     * 在一个或多个执行节点上运行的命令，通过查询数据和结果返回响应。
      */
     ASYNC_QUERY
 

@@ -48,15 +48,19 @@ public class Reflection {
   private Long currentSizeBytes;
   private Long totalSizeBytes;
   private Boolean enabled;
+  // 是否开启 arrow cache，这个貌似是用
   private boolean arrowCachingEnabled;
 
   private ReflectionStatusUI status;
-
+  // 反射维度字段
   private List<ReflectionDimensionField> dimensionFields;
+  // 反射度量字段，应该是 count sum 里面的字段
   private List<ReflectionMeasureField> measureFields;
   private List<ReflectionField> displayFields;
   private List<ReflectionField> distributionFields;
+  // 分区字段
   private List<ReflectionField> partitionFields;
+  // 排序字段
   private List<ReflectionField> sortFields;
 
   private PartitionDistributionStrategy partitionDistributionStrategy;
