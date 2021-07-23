@@ -107,6 +107,7 @@ public class ReflectionExpander {
   public RelNode expand(final ReflectionGoal goal) {
     final ReflectionType type = goal.getType();
     if (type == AGGREGATION) {
+      // 扩展
       return expandAggregation(goal);
     }
 
@@ -133,12 +134,13 @@ public class ReflectionExpander {
   private RelNode expandAggregation(final ReflectionGoal goal) {
     Preconditions.checkArgument(goal.getType() == AGGREGATION, "required aggregation reflection");
 
-    // create grouping
+    // create grouping，反射维度的信息
     List<ReflectionDimensionField> dimensionFieldList = AccelerationUtils.selfOrEmpty(goal.getDetails().getDimensionFieldList());
-
+    // 聚合维度，每个字段的位置信息
     final Iterable<Integer> grouping = dimensionFieldList.stream()
         .map(dim -> getField(dim.getName()).getIndex())
         .collect(Collectors.toList());
+    // 排序去重
     final ImmutableBitSet groupSet = ImmutableBitSet.of(grouping);
 
     // create a project below aggregation
@@ -146,7 +148,7 @@ public class ReflectionExpander {
     // (i) if we need to a timestamp dimension to date
     // (ii) to project a literal for to be used in sum0(1) for accelerating count(1), sum(1) queries
     final List<RelDataTypeField> fields = view.getRowType().getFieldList();
-
+    // 字段和维度类字段的映射关系
     final Map<String, ReflectionDimensionField> dimensions = FluentIterable.from(dimensionFieldList)
         .uniqueIndex(new Function<ReflectionDimensionField, String>() {
           @Override
@@ -174,6 +176,7 @@ public class ReflectionExpander {
             }
 
             final ReflectionDimensionField dimension = dimensions.get(field.getName().toLowerCase());
+            // 维度的基数信息
             final DimensionGranularity granularity = Optional.fromNullable(dimension.getGranularity()).or(DimensionGranularity.DATE);
             switch (granularity) {
               case NORMAL:
@@ -205,16 +208,18 @@ public class ReflectionExpander {
         .toList();
 
     final RelNode child = LogicalProject.create(view, projects, fieldNames);
-    // create measures
+    // create measures，度量的字段
     final List<ReflectionMeasureField> measures = goal.getDetails().getMeasureFieldList();
+    // 每个字段，创建聚合函数
     final List<AggregateCall> calls =  Stream.concat(
           AccelerationUtils.selfOrEmpty(measures)
+            // 每个字段
           .stream()
           .flatMap(this::toCalls)
           ,
           createDefaultMeasures(child))
         .collect(Collectors.toList());
-
+    // 逻辑的聚合信息
     return LogicalAggregate.create(child, false, groupSet, ImmutableList.of(groupSet), calls);
   }
 
@@ -224,11 +229,20 @@ public class ReflectionExpander {
       // are we silently not measuring the field ? should we catch this during validation ?
       return Stream.of();
     }
-
+   /* UNKNOWN(0),
+      MIN(1),
+      MAX(2),
+      SUM(3),
+      COUNT(4),
+      APPROX_COUNT_DISTINCT(5);*/
     // for old systems, make sure we have a default measure list if one is not specificed.
+    // 默认的聚合类型有 MeasureType.COUNT, MeasureType.MAX, MeasureType.MIN, MeasureType.SUM
+    // dremio 产品默认只有，sum 和 count
     List<MeasureType> measures = field.getMeasureTypeList() == null || field.getMeasureTypeList().isEmpty() ? DEFAULT_MEASURE_LIST : field.getMeasureTypeList();
     List<AggregateCall> calls = new ArrayList<>();
+    // 如果字段不是数值类型的话
     final RelDataTypeField f = getField(field.getName());
+    // 所有的测量
     for(MeasureType t : measures) {
       AggregateCall c = createMeasureFor(f, typeFamily.get(), t);
       if(c == null) {
@@ -269,8 +283,9 @@ public class ReflectionExpander {
     if(!ReflectionValidator.getValidMeasures(family).contains(type)) {
       return null;
     }
-
+    //
     switch(type) {
+      // 近似去重
     case APPROX_COUNT_DISTINCT:
       return AggregateCall.create(HyperLogLog.HLL, false, ImmutableList.of(field.getIndex()), -1, 1, view, null, String.format("hll-%s", hyphenLower(field.getName())));
     case COUNT:
@@ -294,6 +309,7 @@ public class ReflectionExpander {
   private Stream<AggregateCall> createDefaultMeasures(final RelNode view) {
     final int literalIndex = view.getRowType().getFieldCount() -1;
     return Stream.of(
+      // 只创建了 sum 和 count 信息
         AggregateCall.create(SqlStdOperatorTable.SUM0, false, ImmutableList.of(literalIndex), -1, 1, view, null, "agg-sum0-0"),
         AggregateCall.create(SqlStdOperatorTable.COUNT, false, ImmutableList.of(literalIndex), -1, 1, view, null, "agg-count1-0")
         );

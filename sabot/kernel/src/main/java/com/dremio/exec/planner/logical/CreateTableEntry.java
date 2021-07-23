@@ -38,7 +38,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @Type(name = "generic", value = GenericCreateTableEntry.class)
 })
 public interface CreateTableEntry {
-
+  // writer 表示输出的写入
   Writer getWriter(OpProps props, PhysicalOperator child) throws IOException;
 
   WriterOptions getOptions();

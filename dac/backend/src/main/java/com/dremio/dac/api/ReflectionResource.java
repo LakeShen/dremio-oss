@@ -43,6 +43,7 @@ import com.google.common.base.Optional;
 /**
  * Reflection API resource.
  */
+// 反射相关的 Rest API
 @APIResource
 @Secured
 @RolesAllowed({"admin", "user"})

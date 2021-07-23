@@ -106,6 +106,7 @@ public class ResourceTracker implements AutoCloseable {
       }
     };
     long startTimeMs = System.currentTimeMillis();
+    // 资源调度结果
     ResourceSchedulingResult resourceSchedulingResult = resourceAllocator.allocate(context, resourceSchedulingProperties,
       resourceSchedulingObserver,
       (x) -> {

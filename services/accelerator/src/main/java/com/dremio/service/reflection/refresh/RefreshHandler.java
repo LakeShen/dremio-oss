@@ -86,31 +86,34 @@ public class RefreshHandler implements SqlToPlanHandler {
   public RefreshHandler() {
     this.writerOptionManager = WriterOptionManager.Instance;
   }
-
+  // 执行反射
   @Override
   public PhysicalPlan getPlan(SqlHandlerConfig config, String sql, SqlNode sqlNode) throws Exception {
     try{
+      // 逻辑计划
       final SqlRefreshReflection materialize = SqlNodeUtil.unwrap(sqlNode, SqlRefreshReflection.class);
 
       if(!SystemUser.SYSTEM_USERNAME.equals(config.getContext().getQueryUserName())) {
         throw SqlExceptionHelper.parseError("$MATERIALIZE not supported.", sql, materialize.getParserPosition())
           .build(logger);
       }
-
+      // 反射服务
       ReflectionService service = config.getContext().getAccelerationManager().unwrap(ReflectionService.class);
 
       // Let's validate the plan.
       ReflectionId reflectionId = new ReflectionId(materialize.getReflectionId());
+      // 反射目标
       Optional<ReflectionGoal> goalOpt = service.getGoal(reflectionId);
       if(!goalOpt.isPresent()) {
         throw SqlExceptionHelper.parseError("Unknown reflection id.", sql, materialize.getReflectionIdPos()).build(logger);
       }
       final ReflectionGoal goal = goalOpt.get();
-
+      // 反射实体
       Optional<ReflectionEntry> entryOpt = service.getEntry(reflectionId);
       if(!entryOpt.isPresent()) {
         throw SqlExceptionHelper.parseError("Unknown reflection id.", sql, materialize.getReflectionIdPos()).build(logger);
       }
+      // 反射实体
       final ReflectionEntry entry = entryOpt.get();
       if(!ReflectionGoalChecker.checkGoal(goal, entry)) {
         throw UserException.validationError().message("Reflection has been updated since reflection was scheduled.").build(logger);
@@ -138,7 +141,10 @@ public class RefreshHandler implements SqlToPlanHandler {
 
       // Disable default raw reflections during plan generation for a refresh
       config.getConverter().getSubstitutionProvider().disableDefaultRawReflection();
+      // 反射决策
       RefreshDecision[] refreshDecisions = new RefreshDecision[1];
+      // 转成 RelNode
+      // 决定物化计划，反射的物化计划？
       final RelNode initial = determineMaterializationPlan(
           config,
           goal,
@@ -151,8 +157,10 @@ public class RefreshHandler implements SqlToPlanHandler {
           reflectionSettings,
           materializationStore,
           refreshDecisions);
+      // 重置
       config.getConverter().getSubstitutionProvider().resetDefaultRawReflection();
-
+      // 反射里面的执行，dremo
+      // 转化 dremio 的执行
       final Rel drel = PrelTransformer.convertToDrelMaintainingNames(config, initial);
 
       // Append the attempt number to the table path
@@ -164,9 +172,11 @@ public class RefreshHandler implements SqlToPlanHandler {
                                             : null;
 
       final boolean isIcebergIncrementalRefresh = isIcebergInsertRefresh(materialization, refreshDecisions[0]);
+      // 物化的路径，是否增量
       final String materializationPath =  isIcebergIncrementalRefresh ?
         materialization.getBasePath() : materialization.getId().getId() + "_" + attemptId.getAttemptNum();
       final String materializationId = materializationPath.split("_")[0];
+     // 物化路径
       final List<String> tablePath =  ImmutableList.of(
           ReflectionServiceImpl.ACCELERATOR_STORAGEPLUGIN_NAME,
           reflectionId.getId(),
@@ -186,11 +196,13 @@ public class RefreshHandler implements SqlToPlanHandler {
       }
 
       final List<String> fields = drel.getRowType().getFieldNames();
-
+      // 写的 rel，写的writer？，再次构建 RelNode
       final Rel writerDrel = new WriterRel(
         drel.getCluster(),
         drel.getCluster().traitSet().plus(Rel.LOGICAL),
+        // 输入表
         drel,
+        // 创建的 iceberg 的表的属性，比如有 ParquetWriter
         config.getContext().getCatalog().createNewTable(
           new NamespaceKey(tablePath),
           icebergTableProps,
@@ -205,7 +217,9 @@ public class RefreshHandler implements SqlToPlanHandler {
       final Pair<Prel, String> convertToPrel = PrelTransformer.convertToPrel(config, screen);
       final Prel prel = convertToPrel.getKey();
       this.textPlan = convertToPrel.getValue();
+      // 物理执行算子
       PhysicalOperator pop = PrelTransformer.convertToPop(config, prel);
+      // 物理执行计划
       PhysicalPlan plan = PrelTransformer.convertToPlan(config, pop);
       if (logger.isTraceEnabled()) {
         PrelTransformer.log(config, "Dremio Plan", plan, logger);
@@ -251,11 +265,11 @@ public class RefreshHandler implements SqlToPlanHandler {
       ReflectionSettings reflectionSettings,
       MaterializationStore materializationStore,
       RefreshDecision[] refreshDecisions) {
-
+    // 反射计划代码的动态生成
     final ReflectionPlanGenerator planGenerator = new ReflectionPlanGenerator(sqlHandlerConfig, namespace,
       context.getPlannerSettings().getOptions(), config, goal, entry, materialization,
       reflectionSettings, materializationStore, getForceFullRefresh(materialization));
-
+    // 生成
     final RelNode normalizedPlan = planGenerator.generateNormalizedPlan();
 
 
@@ -266,7 +280,7 @@ public class RefreshHandler implements SqlToPlanHandler {
       .add(goal.getId().getId())
       .build();
     context.getSession().getSubstitutionSettings().setExclusions(exclusions);
-
+    // 刷新的决策
     RefreshDecision decision = planGenerator.getRefreshDecision();
     refreshDecisions[0] = decision;
 
@@ -282,6 +296,7 @@ public class RefreshHandler implements SqlToPlanHandler {
   }
 
   private Boolean getForceFullRefresh(Materialization materialization) {
+    // 全量刷新还是增量刷新
     Boolean forceRefresh = materialization.getForceFullRefresh();
     return forceRefresh == null ? false : forceRefresh;
   }

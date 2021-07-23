@@ -28,7 +28,7 @@ import com.dremio.exec.store.RecordWriter;
 
 /** Base class for logical and physical Writer implemented in Dremio. */
 public abstract class WriterRelBase extends SingleRel {
-
+  // 创建表的实体
   private final CreateTableEntry createTableEntry;
 
   public WriterRelBase(Convention convention, RelOptCluster cluster, RelTraitSet traitSet, RelNode input,
@@ -36,7 +36,7 @@ public abstract class WriterRelBase extends SingleRel {
     super(cluster, traitSet, input);
     assert input.getConvention() == convention;
     this.createTableEntry = createTableEntry;
-
+    // apache arrow 的类型
     rowType = CalciteArrowHelper.wrap(RecordWriter.SCHEMA).toCalciteRecordType(getCluster().getTypeFactory(), PrelUtil.getPlannerSettings(getCluster()).isFullNestedSchemaSupport());
   }
 

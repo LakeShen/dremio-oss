@@ -67,6 +67,7 @@ public class OperatorCreatorRegistry implements OperatorCreator {
 
   @Override
   public <T extends PhysicalOperator> SingleInputOperator getSingleInputOperator(OperatorContext context, T operator) throws ExecutionSetupException {
+    // 使用 算子的 creator 来创建的
     SingleInputOperator.Creator<T> creator = (SingleInputOperator.Creator<T>) singleInputCreators
         .get(operator.getClass());
     Preconditions.checkNotNull(creator, "Unable to find creator for operator of type %s with configuration %s", operator.getClass().getName(), operator.toString());

@@ -42,7 +42,7 @@ class ProgressTracker implements AutoCloseable {
     this.queryId = queryId;
     this.jobTelemetryClient = jobTelemetryClient;
     this.observer = observer;
-
+    // 订阅更新
     subscribeForUpdates();
   }
 

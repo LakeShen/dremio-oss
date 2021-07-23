@@ -52,6 +52,7 @@ import io.netty.util.internal.PlatformDependent;
  *    Array<4 byte batch counts>
  *    <8 byte footer start offset></8>
  */
+// arrow 文件存储类
 public class ArrowFlatBufRecordWriter implements RecordWriter {
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ArrowFlatBufRecordWriter.class);
@@ -109,6 +110,7 @@ public class ArrowFlatBufRecordWriter implements RecordWriter {
 
 
     final VectorAccessibleFlatBufSerializable serializable = new VectorAccessibleFlatBufSerializable(incoming, null);
+    // 写到外部
     serializable.writeToStream(outputStream);
 
     this.recordCount += recordCount;

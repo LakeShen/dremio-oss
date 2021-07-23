@@ -77,8 +77,9 @@ import com.google.common.collect.Iterables;
  */
 public class MaterializationStore {
 //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MaterializationStore.class);
-
+  // 物化存储表
   private static final String MATERIALIZATION_TABLE_NAME = "materialization_store";
+  // refresh 存储表
   private static final String REFRESH_TABLE_NAME = "refresh_store";
 
   private static final SearchFieldSorting LAST_REFRESH = SearchTypes.SearchFieldSorting.newBuilder()
@@ -121,6 +122,7 @@ public class MaterializationStore {
       }
     });
 
+    // refresh store
     this.refreshStore = Suppliers.memoize(new Supplier<LegacyIndexedStore<RefreshId, Refresh>>() {
       @Override
       public LegacyIndexedStore<RefreshId, Refresh> get() {

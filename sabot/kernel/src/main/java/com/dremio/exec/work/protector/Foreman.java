@@ -174,7 +174,7 @@ public class Foreman {
       if (reason != AttemptReason.NONE && attemptHandler.hasOOM()) {
         optionProvider = new LowMemOptionProvider(config);
       }
-
+      // 一次执行的管理器，一次语句的执行，是一个线程
       attemptManager = newAttemptManager(context, attemptId, request, attemptObserver, session,
         optionProvider, preparedPlans, planCache, datasetValidityChecker, commandPool);
 

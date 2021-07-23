@@ -127,7 +127,7 @@ public class MaestroServiceImpl implements MaestroService {
     execToCoordStatusHandlerImpl = new ExecToCoordStatusHandlerImpl(jobTelemetryClient);
     reader = sabotContext.get().getPlanReader();
   }
-
+  // 执行查询
   @Override
   public void executeQuery(
     QueryId queryId,
@@ -150,6 +150,7 @@ public class MaestroServiceImpl implements MaestroService {
     "query already queued for execution " + QueryIdHelper.getQueryId(queryId));
 
     // allocate execution resources on the calling thread, as this will most likely block
+    // 分配查询资源来源于
     queryTracker.allocateResources();
 
     try {
@@ -165,13 +166,15 @@ public class MaestroServiceImpl implements MaestroService {
           observer.commandPoolWait(waitInMillis);
           queryTracker.planExecution();
           return null;
-        }, runInSameThread).get();
+        },
+        // 是否在同一个线程运行？
+        runInSameThread).get();
     } catch (ExecutionException|InterruptedException e) {
       throw new ExecutionSetupException("failure during execution planning", e);
     }
 
     observer.beginState(AttemptObserver.toEvent(AttemptEvent.State.STARTING));
-    // propagate the fragments.
+    // propagate the fragments.，传播片段
     queryTracker.startFragments();
 
     injector.injectChecked(context.getExecutionControls(), INJECTOR_EXECUTE_QUERY_END_ERROR,

@@ -155,6 +155,7 @@ public class AttemptManager implements Runnable {
   private final Pointer<QueryId> prepareId;
   private final CommandPool commandPool;
   private CommandRunner<?> command;
+  // 异步线程的类
   private Optional<Runnable> committer = Optional.empty();
 
   /**
@@ -326,13 +327,13 @@ public class AttemptManager implements Runnable {
     queryContext.getExecutionControls().unpauseAll();
   }
 
+  // 一次 SQL 的执行
   @Override
   public void run() {
     // rename the thread we're using for debugging purposes
     final Thread currentThread = Thread.currentThread();
     final String originalName = currentThread.getName();
     currentThread.setName(queryIdString + ":foreman");
-
 
     try {
       injector.injectChecked(queryContext.getExecutionControls(), INJECTOR_TRY_BEGINNING_ERROR,
@@ -342,15 +343,17 @@ public class AttemptManager implements Runnable {
 
       observer.queryStarted(queryRequest, queryContext.getSession().getCredentials().getUserName());
       // 规则集引擎？
+      // 难道是运行的引擎，比如 YARN,K8s,aws 等？
       String ruleSetEngine = ruleBasedEngineSelector.resolveAndUpdateEngine(queryContext);
-
+      // 调度资源配置
       ResourceSchedulingProperties resourceSchedulingProperties = new ResourceSchedulingProperties();
       resourceSchedulingProperties.setRoutingEngine(queryContext.getSession().getRoutingEngine());
       resourceSchedulingProperties.setRuleSetEngine(ruleSetEngine);
+      // 资源组信息
       final GroupResourceInformation groupResourceInformation =
         maestroService.getGroupResourceInformation(queryContext.getOptions(), resourceSchedulingProperties);
       queryContext.setGroupResourceInformation(groupResourceInformation);
-
+      // 最终翻译为 CommandRunner
       // planning is done in the command pool
       commandPool.submit(CommandPool.Priority.LOW, attemptId.toString() + ":foreman-planning",
         (waitInMillis) -> {
@@ -370,9 +373,12 @@ public class AttemptManager implements Runnable {
       // 异步 Query
       if (command.getCommandType() == CommandType.ASYNC_QUERY) {
         AsyncCommand asyncCommand = (AsyncCommand) command;
+        // refresh 线程 null
         committer = asyncCommand.getPhysicalPlan().getCommitter();
 
         moveToState(QueryState.STARTING, null);
+        // 执行物理执行计划
+        // 这个地方还有一个
         maestroService.executeQuery(queryId, queryContext, asyncCommand.getPhysicalPlan(), runInSameThread,
           new MaestroObserverWrapper(observer), new CompletionListenerImpl());
         asyncCommand.executionStarted();
@@ -449,7 +455,7 @@ public class AttemptManager implements Runnable {
 
     CommandCreator creator = newCommandCreator(queryContext, observer, prepareId);
     // 一条 sql 底层翻译成 CommandRunner 来运行
-    // CommandRunner
+    // CommandRunner，HandlerToExec
     command = creator.toCommand();
     logger.debug("Using command: {}.", command);
 
@@ -458,6 +464,7 @@ public class AttemptManager implements Runnable {
     switch (command.getCommandType()) {
       case ASYNC_QUERY:
         Preconditions.checkState(command instanceof AsyncCommand, "Asynchronous query must be an AsyncCommand");
+        // 生成 plan
         command.plan();
         break;
       // 都在协调器上运行，Master Coordinator
@@ -607,7 +614,7 @@ public class AttemptManager implements Runnable {
 
         try {
           injector.injectChecked(queryContext.getExecutionControls(), "commit-failure", UnsupportedOperationException.class);
-
+          //关闭的时候，执行
           if (resultState == QueryState.COMPLETED) {
             committer.ifPresent(x -> x.run());
           }

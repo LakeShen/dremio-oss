@@ -118,7 +118,7 @@ public class QueryTrackerImpl implements QueryTracker {
       INJECTOR_EXECUTION_PLANNING_ERROR, ExecutionSetupException.class);
     injector.injectPause(context.getExecutionControls(),
       INJECTOR_EXECUTION_PLANNING_PAUSE, logger);
-
+    // 执行计划
     executionPlan = ExecutionPlanCreator.getExecutionPlan(context, reader, observer, physicalPlan,
       resourceTracker.getResources(),
       executionPlanningResources.getPlanningSet(), executorSelectionService,
@@ -133,8 +133,9 @@ public class QueryTrackerImpl implements QueryTracker {
     Preconditions.checkNotNull(executionPlan, "execution plan required");
 
     // Populate fragments before sending the query fragments.
+    //在发送查询片段之前填充片段。
     fragmentTracker.populate(executionPlan.getFragments(), resourceTracker.getResourceSchedulingDecisionInfo());
-
+    // 发现者
     AbstractMaestroObserver fragmentActivateObserver  = new AbstractMaestroObserver() {
       @Override
       public void activateFragmentFailed(Exception ex) {
@@ -148,6 +149,7 @@ public class QueryTrackerImpl implements QueryTracker {
       FragmentStarter starter = new FragmentStarter(executorServiceClientFactory,
         resourceTracker.getResourceSchedulingDecisionInfo(),
         context.getExecutionControls());
+      // 开始物理执行？？
       starter.start(executionPlan, MaestroObservers.of(observer, fragmentActivateObserver));
       executionPlan = null; // no longer needed
 

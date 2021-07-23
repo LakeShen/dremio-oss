@@ -48,7 +48,7 @@ public class Reflection {
   private Long currentSizeBytes;
   private Long totalSizeBytes;
   private Boolean enabled;
-  // 是否开启 arrow cache，这个貌似是用
+  // 是否开启 arrow cache，这个底层使用 arrow 磁盘格式粗才能
   private boolean arrowCachingEnabled;
 
   private ReflectionStatusUI status;
@@ -56,7 +56,9 @@ public class Reflection {
   private List<ReflectionDimensionField> dimensionFields;
   // 反射度量字段，应该是 count sum 里面的字段
   private List<ReflectionMeasureField> measureFields;
+  // 明细字段
   private List<ReflectionField> displayFields;
+  // hash 字段？
   private List<ReflectionField> distributionFields;
   // 分区字段
   private List<ReflectionField> partitionFields;

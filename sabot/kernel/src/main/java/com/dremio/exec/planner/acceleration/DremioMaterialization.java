@@ -32,6 +32,7 @@ import com.google.common.base.Preconditions;
 /**
  * This extension of RelOptMaterialization is used in Dremio acceleration. It stores and makes
  * accessible information about incremental updates
+ * dremio 物化信息
  */
 public class DremioMaterialization {
   private final RelNode tableRel;

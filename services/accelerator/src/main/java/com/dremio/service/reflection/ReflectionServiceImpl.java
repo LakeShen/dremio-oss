@@ -179,7 +179,7 @@ public class ReflectionServiceImpl extends BaseReflectionService {
   private final ReflectionSettings reflectionSettings;
   private final ExecutorService executorService;
   private final BufferAllocator allocator;
-
+  //reflection 反射存储类
   private final ReflectionGoalsStore userStore;
   private final ReflectionEntriesStore internalStore;
   private final MaterializationStore materializationStore;
@@ -188,11 +188,14 @@ public class ReflectionServiceImpl extends BaseReflectionService {
   private final RefreshRequestsStore requestsStore;
   private final boolean isMaster;
   private final CacheHelperImpl cacheHelper = new CacheHelperImpl();
+  // 下一次所有需要更新的反射
   /** set of all reflections that need to be updated next time the reflection manager wakes up */
   private final Set<ReflectionId> reflectionsToUpdate = Sets.newConcurrentHashSet();
 
   private DependencyManager dependencyManager;
+  // 物化 cache
   private MaterializationCache materializationCache;
+  //
   private WakeupHandler wakeupHandler;
 
   private final CacheViewer cacheViewer = new CacheViewer() {
@@ -338,6 +341,7 @@ public class ReflectionServiceImpl extends BaseReflectionService {
         masterInit();
       }
        // sends a wakeup event every reflection_manager_refresh_delay
+      // 周期性 wakeup Manager
       schedulerService.get().schedule(scheduleForRunningOnceAt(getNextRefreshTimeInMillis(), LOCAL_TASK_LEADER_NAME),
         new Runnable() {
           @Override
@@ -403,7 +407,7 @@ public class ReflectionServiceImpl extends BaseReflectionService {
         this::wakeupManager
       )
     );
-
+    // reflectionmanager 是一个线程
     wakeupHandler = new WakeupHandler(executorService, reflectionManager);
   }
 
@@ -502,19 +506,21 @@ public class ReflectionServiceImpl extends BaseReflectionService {
     try {
       Preconditions.checkArgument(goal.getId() == null, "new reflection shouldn't have an ID");
       Preconditions.checkState(goal.getTag() == null, "new reflection shouldn't have a version");
+      // 验证反射
       validator.validate(goal);
     } catch (Exception e) {
       throw UserException.validationError().message("Invalid reflection: %s", e.getMessage()).build(logger);
     }
-
+    // 生成 反射
     final ReflectionId reflectionId = new ReflectionId(UUID.randomUUID().toString());
     goal.setId(reflectionId);
-
+    // 反射信息会被存储
     userStore.save(goal);
-
+    // 验证反射关联的计划缓存
     invalidateReflectionAssociatedPlanCache(goal.getDatasetId());
 
     logger.debug("create reflection goal {} (named {})", reflectionId.getId(), goal.getName());
+    // 唤醒 reflection 的 manager 信息
     wakeupManager("reflection goal created");
     return reflectionId;
   }
@@ -867,7 +873,9 @@ public class ReflectionServiceImpl extends BaseReflectionService {
     return sabotContext.get().getOptionManager();
   }
 
+  // 唤醒 Reflection manager 运行
   private Future<?> wakeupManager(String reason, boolean periodic) {
+    // 是否周期性唤醒，这个值默认为 false
     final boolean periodicWakeupOnly = getOptionManager().getOption(REFLECTION_PERIODIC_WAKEUP_ONLY);
     if (wakeupHandler != null && (!periodicWakeupOnly || periodic)) {
       return wakeupHandler.handle(reason);
@@ -1235,21 +1243,30 @@ public class ReflectionServiceImpl extends BaseReflectionService {
   }
 
   private void invalidateReflectionAssociatedPlanCache(String datasetId) {
+    // 验证反射关联的计划缓存
     try (PlanCacheInvalidationHelper helper = planCacheInvalidationHelper.get()) {
       PlanCache planCache = foremenWorkManagerProvider.get().getPlanCacheHandle();
       if (!helper.isPlanCacheEnabled() || planCache == null) {
         return;
       }
+      // catalog 信息
       Catalog catalog = helper.getCatalog();
+      // 如果是 dremio 的 catalog
       if (catalog instanceof DelegatingCatalog || catalog instanceof CachingCatalog) {
+        // 队列？
         Queue<DatasetConfig> configQueue = new LinkedList<>();
         configQueue.add(catalog.getTable(datasetId).getDatasetConfig());
         while (!configQueue.isEmpty()) {
+          // 反射的配置
           DatasetConfig config = configQueue.remove();
+          // 如果是物理数据集
           if (config.getType() == DatasetType.PHYSICAL_DATASET || config.getType() == DatasetType.PHYSICAL_DATASET_SOURCE_FILE) {
+            // 获取物理数据集
             PhysicalDataset dataset = config.getPhysicalDataset();
             planCache.invalidateCacheOnDataset(dataset);
-          } else if (config.getType() == DatasetType.VIRTUAL_DATASET && config.getVirtualDataset().getParentsList() != null) {
+          }
+          // 如果是虚拟集
+          else if (config.getType() == DatasetType.VIRTUAL_DATASET && config.getVirtualDataset().getParentsList() != null) {
             for (ParentDataset parent : config.getVirtualDataset().getParentsList()){
               try {
                 NamespaceKey namespaceKey = new NamespaceKey(parent.getDatasetPathList());

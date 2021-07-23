@@ -65,6 +65,7 @@ class ExternalListenerManager {
 
   public synchronized void queryProgressed(JobSummary jobSummary) {
     if (active) {
+      // 作业事件
       for (StreamObserver<JobEvent> observer : statusObservers) {
         sendQueryProgressedEvent(jobSummary, observer);
       }

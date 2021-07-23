@@ -50,6 +50,7 @@ public class CoordToExecTunnel {
 
   public void activateFragments(RpcOutcomeListener<Ack> outcomeListener, ActivateFragments fragments){
     SendFragment b = new SendFragment(outcomeListener, RpcType.REQ_ACTIVATE_FRAGMENTS, fragments);
+    // 命令？
     manager.runCommand(b);
   }
 

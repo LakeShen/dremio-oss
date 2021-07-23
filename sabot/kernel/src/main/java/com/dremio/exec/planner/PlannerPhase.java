@@ -222,6 +222,7 @@ public enum PlannerPhase {
     public RuleSet getRules(OptimizerRulesContext context) {
       ImmutableList.Builder<RelOptRule> b = ImmutableList.builder();
       PlannerSettings ps = context.getPlannerSettings();
+      //添加了一些优化规则
       b.add(
         ConvertCountDistinctToHll.INSTANCE,
         RewriteNdvAsHll.INSTANCE,

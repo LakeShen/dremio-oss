@@ -174,18 +174,27 @@ public class ReflectionUtils {
 
   public static JobId submitRefreshJob(JobsService jobsService, NamespaceService namespaceService, ReflectionEntry entry,
       Materialization materialization, String sql, JobStatusListener jobStatusListener) {
+    // SQL Query
+    // sql 是REFRESH REFLECTION 反射id as 物化 id
     final SqlQuery query = SqlQuery.newBuilder()
       .setSql(sql)
       .addAllContext(Collections.<String>emptyList())
       .setUsername(SYSTEM_USERNAME)
       .build();
+    // 数据集的 路径 list?
     NamespaceKey datasetPathList = new NamespaceKey(namespaceService.findDatasetByUUID(entry.getDatasetId()).getFullPathList());
+    // job 物化描述
     JobProtobuf.MaterializationSummary materializationSummary = JobProtobuf.MaterializationSummary.newBuilder()
+      // 数据集 id
       .setDatasetId(entry.getDatasetId())
+      // 反射 id
       .setReflectionId(entry.getId().getId())
       .setLayoutVersion(entry.getTag())
+      // 物化 id
       .setMaterializationId(materialization.getId().getId())
+      // 物化名称
       .setReflectionName(entry.getName())
+      // 反射类型
       .setReflectionType(entry.getType().toString())
       .build();
 
@@ -197,6 +206,7 @@ public class ReflectionUtils {
           .setSubstitutionSettings(SubstitutionSettings.newBuilder().addAllExclusions(ImmutableList.of()).build())
           .build())
         .setSqlQuery(query)
+        // 加速器
         .setQueryType(JobsProtoUtil.toBuf(QueryType.ACCELERATOR_CREATE))
         .setVersionedDataset(VersionedDatasetPath.newBuilder().addAllPath(datasetPathList.getPathComponents()).build())
         .build(),
@@ -536,7 +546,7 @@ public class ReflectionUtils {
           rowTypeBuilder.add(input);
           return rexBuilder.makeInputRef(input.getType(), input.getIndex());
         }}).toList();
-
+    // 逻辑上的字段选取
     return new LogicalProject(node.getCluster(), node.getTraitSet(), node, projects, rowTypeBuilder.build());
   }
 

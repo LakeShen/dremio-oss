@@ -1220,6 +1220,7 @@ public class FileSystemPlugin<C extends FileSystemConf<C, ?>> implements Storage
     icebergOpCommitter.commit();
   }
 
+  // HDFS 上面的插件
   @Override
   public CreateTableEntry createNewTable(SchemaConfig config, NamespaceKey key, IcebergTableProps icebergTableProps,
                                          WriterOptions writerOptions, Map<String, Object> storageOptions) {
@@ -1228,7 +1229,7 @@ public class FileSystemPlugin<C extends FileSystemConf<C, ?>> implements Storage
         .message("Unable to create table. Schema [%s] is immutable for this user.", key.getParent())
         .build(logger);
     }
-
+    // 表的名称
     final String tableName = getTableName(key);
 
     final FormatPlugin formatPlugin;

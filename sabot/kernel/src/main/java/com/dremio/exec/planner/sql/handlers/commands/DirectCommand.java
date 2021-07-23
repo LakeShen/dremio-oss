@@ -78,6 +78,7 @@ public class DirectCommand<T, R> implements CommandRunner<Object> {
     try(BufferAllocator allocator = context.getAllocator().newChildAllocator("direct-command", 0, Long.MAX_VALUE);
         VectorContainer vc = VectorContainer.create(allocator, schema);
         BufferManager manager = new BufferManagerImpl(allocator);
+        // 数据源的 Reader?
       final PojoRecordReader<T> reader = new PojoRecordReader<>(handler.getResultType(), result.iterator());
 
         ) {

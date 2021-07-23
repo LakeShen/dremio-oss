@@ -24,6 +24,7 @@ import com.dremio.exec.planner.physical.Prel;
 /**
  * Relational expression that is implemented in Dremio.
  */
+// Rel 是 Dremio 的 RelNode
 public interface Rel extends RelNode {
   /** Calling convention for relational expressions that are "implemented" by
    * generating Dremio logical plans. */

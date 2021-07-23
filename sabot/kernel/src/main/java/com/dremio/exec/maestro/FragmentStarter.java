@@ -59,6 +59,7 @@ import io.grpc.stub.StreamObserver;
 
 /**
  * Class used to start remote fragment execution.
+ * 用于启动远程片段执行的类。
  */
 class FragmentStarter {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(FragmentStarter.class);
@@ -113,6 +114,8 @@ class FragmentStarter {
    * Set up the fragments for execution. Some may be local, and some may be remote.
    * Messages are sent immediately, so they may start returning data even before we complete this.
    *
+   * *设置要执行的片段。有些可能是本地的，有些可能是偏远的。
+   * *消息被立即发送，所以他们可能在我们完成之前就开始返回数据。
    * @param plan the execution plan
    */
   protected void startFragments(ExecutionPlan plan, MaestroObserver observer) {
@@ -326,6 +329,7 @@ class FragmentStarter {
       listener.onError(ex);
       return;
     }
+    // node
     executorServiceClientFactory.getClientForEndpoint(assignment).activateFragments(activateFragments, listener);
   }
 

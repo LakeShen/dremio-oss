@@ -137,11 +137,11 @@ class ReflectionPlanNormalizer implements RelTransformer {
     if (IncrementalUpdateServiceUtils.extractRefreshSettings(strippedPlan, reflectionSettings).getMethod() == RefreshMethod.INCREMENTAL) {
       strippedPlan = factory.strip(plan, mapReflectionType(goal.getType()), true, StrippingFactory.LATEST_STRIP_VERSION).getNormalized();
     }
-
+    // dremio 所有的表 ，包括虚拟和物理数据集？
     Iterable<DremioTable> requestedTables = sqlHandlerConfig.getContext().getCatalog().getAllRequestedTables();
 
     final RelSerializerFactory serializerFactory = RelSerializerFactory.getPlanningFactory(config, sqlHandlerConfig.getScanResult());
-
+    // 获取 refresh 决策
     this.refreshDecision = RefreshDecisionMaker.getRefreshDecision(
       entry,
       materialization,
@@ -154,7 +154,7 @@ class ReflectionPlanNormalizer implements RelTransformer {
       serializerFactory,
       optionManager.getOption(ReflectionOptions.STRICT_INCREMENTAL_REFRESH),
       forceFullUpdate);
-
+    // 是否是增量的 refresh 决策
     if (isIncremental(refreshDecision)) {
       try {
       strippedPlan = strippedPlan.accept(getIncremental(refreshDecision));

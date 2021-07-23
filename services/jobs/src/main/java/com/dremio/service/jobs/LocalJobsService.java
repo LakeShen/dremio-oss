@@ -590,16 +590,21 @@ public class LocalJobsService implements Service, JobResultInfoProvider {
             ? jobRequest.getVersionedDataset().getPath(0) : null;
 
     final JobInfo jobInfo = JobsServiceUtil.createJobInfo(jobRequest, jobId, inSpace);
+    // 一次 job 尝试
     final JobAttempt jobAttempt = new JobAttempt()
         .setInfo(jobInfo)
         .setEndpoint(identity)
         .setState(PENDING)
         .setDetails(new JobDetails());
+    // 构建 job
     final Job job = new Job(jobId, jobAttempt);
 
-    // (2) deduce execution configuration
+    // (2) 推断出 deduce execution configuration
+    // 如果是反射刷新的话，查询类型为 ACCELERATOR_CREATE
     final QueryType queryType = JobsProtoUtil.toStuff(jobRequest.getQueryType());
+    // false
     final boolean enableLeafLimits = QueryTypeUtils.requiresLeafLimits(queryType);
+    // 本地执行配置
     final LocalExecutionConfig config =
         LocalExecutionConfig.newBuilder()
             .setEnableLeafLimits(enableLeafLimits)
@@ -618,7 +623,10 @@ public class LocalJobsService implements Service, JobResultInfoProvider {
 
     // (3) register listener
     final QueryListener jobObserver = new QueryListener(job, eventObserver, planTransformationListener);
+    // 存储作业
     storeJob(job);
+    // 添加到运行作业中
+    // 作业和 listener
     runningJobs.put(jobId, jobObserver);
 
     final boolean isPrepare = queryType.equals(QueryType.PREPARE_INTERNAL);
@@ -643,6 +651,7 @@ public class LocalJobsService implements Service, JobResultInfoProvider {
 
     // (4) submit the job
     try {
+      // 提交作业
       queryExecutor.get()
         .submitLocalQuery(externalId, jobObserver, queryRequest, isPrepare, config, jobRequest.getRunInSameThread());
     } catch (Exception ex) {
@@ -738,15 +747,17 @@ public class LocalJobsService implements Service, JobResultInfoProvider {
       .build();
 
   }
-
+  // 提交作业
   @VisibleForTesting
   public JobId submitJob(
       SubmitJobRequest submitJobRequest,
       StreamObserver<JobEvent> eventObserver,
       PlanTransformationListener planTransformationListener
   ) {
+    // 提交作业的请求
     final SubmitJobRequest jobRequest = validateJobRequest(submitJobRequest);
     final ExternalId externalId = ExternalIdHelper.generateExternalId();
+    // 生成作业 ID
     final JobId jobId = JobsServiceUtil.getExternalIdAsJobId(externalId);
     checkNotNull(eventObserver, "an event observer must be provided");
     final JobEventCollatingObserver collatingObserver = new JobEventCollatingObserver(jobId, eventObserver);
@@ -759,7 +770,7 @@ public class LocalJobsService implements Service, JobResultInfoProvider {
             .message(UserException.QUERY_REJECTED_MSG)
             .buildSilently();
         }
-
+        // 开始一个任务
         startJob(externalId, jobRequest, collatingObserver, planTransformationListener);
         logger.debug("Submitted new job. Id: {} Type: {} Sql: {}", jobId.getId(), jobRequest.getQueryType(),
           jobRequest.getSqlQuery());
@@ -1633,11 +1644,13 @@ public class LocalJobsService implements Service, JobResultInfoProvider {
     public void planCompleted(final ExecutionPlan plan) {
       if (plan != null) {
         try {
+          //
           builder.addBatchSchema(RootSchemaFinder.getSchema(plan.getRootOperator()));
         } catch (Exception e) {
           exception.addException(e);
         }
       }
+      // job 加速器
       job.getJobAttempt().setAccelerationDetails(
         ByteString.copyFrom(detailsPopulator.computeAcceleration()));
 
@@ -1833,7 +1846,7 @@ public class LocalJobsService implements Service, JobResultInfoProvider {
           }
 
           VarBinaryVector metadataVector = (VarBinaryVector) vectors.get(3);
-
+          // Arrow 文件格式
           for (int i = 0; i < batch.getRecordCount(); i++) {
             final ArrowFileFormat.ArrowFileMetadata metadata =
                 ArrowFileFormat.ArrowFileMetadata.parseFrom(metadataVector.getObject(i));

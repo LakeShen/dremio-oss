@@ -616,6 +616,7 @@ public class CatalogImpl implements Catalog {
   }
 
   private MutablePlugin asMutable(NamespaceKey key, String error) {
+    // 存储插件
     StoragePlugin plugin = sourceModifier.getSource(key.getRoot());
     if (plugin instanceof MutablePlugin) {
       return (MutablePlugin) plugin;
@@ -831,6 +832,7 @@ public class CatalogImpl implements Catalog {
 
   @Override
   public UpdateStatus refreshDataset(NamespaceKey key, DatasetRetrievalOptions retrievalOptions) {
+    // 存储插件
     final ManagedStoragePlugin plugin = pluginRetriever.getPlugin(key.getRoot(), true);
     if (plugin == null) {
       throw UserException.validationError()

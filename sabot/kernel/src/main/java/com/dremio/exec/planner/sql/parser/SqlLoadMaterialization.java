@@ -35,6 +35,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 
+// sql 加载物化的逻辑
 public class SqlLoadMaterialization extends SqlCall implements SimpleDirectHandler.Creator {
 
   public static final SqlSpecialOperator OPERATOR = new SqlSpecialOperator("LOAD_MATERIALIZATION_METADATA", SqlKind.OTHER) {

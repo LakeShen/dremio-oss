@@ -279,6 +279,7 @@ public class CommandCreator {
           context.getScanResult());
 
       injector.injectChecked(context.getExecutionControls(), "sql-parsing", ForemanSetupException.class);
+      //dremio catalog reader
       final DremioCatalogReader reader = parser.getCatalogReader();
       final Catalog catalog = context.getCatalog();
       // 解析 sql，形成 SQlNode (AST)
@@ -290,12 +291,14 @@ public class CommandCreator {
       final DirectBuilder direct = new DirectBuilder(sql, sqlNode, prepareMetadataType);
       // 异步 CommandRunner
       final AsyncBuilder async = new AsyncBuilder(sql, sqlNode, prepareMetadataType);
-
+      // 如果 SqlCompactMaterialization（合并物化） or SqlRefreshReflection（刷新物化）
       //TODO DX-10976 refactor all handlers to use similar Creator interfaces
       if(sqlNode instanceof SqlToPlanHandler.Creator) {
         SqlToPlanHandler.Creator creator = (SqlToPlanHandler.Creator) sqlNode;
         return async.create(creator.toPlanHandler(), config);
-      } else if (sqlNode instanceof SimpleDirectHandler.Creator) {
+      }
+      // SqlLoadMaterialization 加载物化
+      else if (sqlNode instanceof SimpleDirectHandler.Creator) {
         SimpleDirectHandler.Creator creator = (SimpleDirectHandler.Creator) sqlNode;
         return direct.create(creator.toDirectHandler(context));
       }
@@ -310,22 +313,22 @@ public class CommandCreator {
         } else if (sqlNode instanceof SqlSetOption) {
           return direct.create(new SetOptionHandler(context));
         }
-
+      // 描述表的信息
       case DESCRIBE_TABLE:
         return direct.create(new DescribeTableHandler(reader));
-
+      // 创建视图
       case CREATE_VIEW:
         return direct.create(new CreateViewHandler(config));
-
+// 删除表
       case DROP_TABLE:
         return direct.create(new DropTableHandler(catalog));
-
+// 删除视图
       case DROP_VIEW:
         return direct.create(new DropViewHandler(catalog));
-
+// 创建表
       case CREATE_TABLE:
         return async.create(new CreateTableHandler(), config);
-
+// 编辑表
       case ALTER_TABLE:
         if (sqlNode instanceof SqlAlterTableAddColumns) {
           return direct.create(new AddColumnsHandler(catalog, config));
@@ -334,10 +337,10 @@ public class CommandCreator {
         } else if (sqlNode instanceof SqlAlterTableDropColumn) {
           return direct.create(new DropColumnHandler(catalog, config));
         }
-
+// insert
       case INSERT:
         return async.create(new InsertTableHandler(), config);
-
+// 其他
       case OTHER:
       case OTHER_DDL:
         if (sqlNode instanceof SqlShowSchemas) {
@@ -348,24 +351,35 @@ public class CommandCreator {
           return direct.create(new ShowTablesHandler(catalog));
         } else if (sqlNode instanceof SqlUseSchema) {
           return direct.create(new UseSchemaHandler(context.getSession(), catalog));
-          // SQL 语句中创建数据反射
-        } else if (sqlNode instanceof SqlCreateReflection) {
+
+        }
+        // SQL 语句中创建数据反射
+        else if (sqlNode instanceof SqlCreateReflection) {
           return direct.create(new AccelCreateReflectionHandler(catalog, context.getAccelerationManager(), getReflectionContext(), context.getOptions().getOption(PlannerSettings.FULL_NESTED_SCHEMA_SUPPORT)));
-        } else if (sqlNode instanceof SqlAddExternalReflection) {
+        }
+        // add 外部反射
+        else if (sqlNode instanceof SqlAddExternalReflection) {
           return direct.create(new AccelAddExternalReflectionHandler(catalog, context.getAccelerationManager(), getReflectionContext()));
         } else if (sqlNode instanceof SqlAccelToggle) {
           return direct.create(new AccelToggleHandler(catalog, context.getAccelerationManager(), getReflectionContext()));
-        } else if (sqlNode instanceof SqlDropReflection) {
+        }
+        // 删除反射
+        else if (sqlNode instanceof SqlDropReflection) {
           return direct.create(new AccelDropReflectionHandler(catalog, context.getAccelerationManager(), getReflectionContext()));
         } else if (sqlNode instanceof SqlForgetTable) {
           return direct.create(new ForgetTableHandler(catalog));
-        } else if (sqlNode instanceof SqlRefreshTable) {
+
+        } // 刷新IAO
+         else if (sqlNode instanceof SqlRefreshTable) {
+          // refresh
           return direct.create(new RefreshTableHandler(catalog));
         } else if (sqlNode instanceof SqlRefreshSourceStatus) {
           return direct.create(new RefreshSourceStatusHandler(catalog));
         } else if (sqlNode instanceof SqlSetApprox) {
           return direct.create(new SetApproxHandler(catalog));
-        } else if (sqlNode instanceof SqlCreateEmptyTable) {
+        }
+         // 创建空表
+         else if (sqlNode instanceof SqlCreateEmptyTable) {
           return direct.create(new CreateEmptyTableHandler(catalog, config));
         } else if (sqlNode instanceof SqlTruncateTable) {
           return direct.create(new TruncateTableHandler(config));
@@ -443,6 +457,7 @@ public class CommandCreator {
           return new HandlerToPrepareArrowPlan(context, sqlNode, handler, preparedPlans, sql, observer, config);
         case NONE:
         default:
+          // 准备执行
           return new HandlerToExec(observer, sql, sqlNode, handler, config);
       }
     }

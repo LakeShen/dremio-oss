@@ -66,7 +66,7 @@ class FragmentTracker implements AutoCloseable {
   private volatile ListenableSet executorSet;
   private volatile boolean cancelled;
   private volatile boolean queryCloserInvoked;
-
+  // 和节点通信的 NodeEndPoint?
   private Set<NodeEndpoint> pendingNodes = ConcurrentHashMap.newKeySet();
   private Set<NodeEndpoint> lostNodes = ConcurrentHashMap.newKeySet();
 

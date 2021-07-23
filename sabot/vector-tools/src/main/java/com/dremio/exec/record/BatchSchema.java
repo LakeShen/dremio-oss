@@ -70,6 +70,7 @@ import io.protostuff.ByteString;
 
 /**
  * An Arrow schema that also carries BatchSchema.
+ * Arrow 的 schema
  */
 @JsonSerialize(using=BatchSchema.Ser.class)
 @JsonDeserialize(using=BatchSchema.De.class)

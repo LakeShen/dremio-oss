@@ -320,10 +320,12 @@ public class DremioCost implements RelOptCost {
    *
    */
   public static double aggregateCost(final org.apache.calcite.plan.RelOptCost cost) {
+    // cpu 消费 + 磁盘读取的字节消费
     final double aggCost = DremioCost.BASE_CPU_COST * cost.getCpu() + DremioCost.BYTE_DISK_READ_COST * cost.getIo();
-
+    // 如果是 dremio 消耗
     if (cost instanceof DremioCost) {
       final DremioCost dremioCost = (DremioCost) cost;
+      // 加网络+ 加内存
       return aggCost + DremioCost.BYTE_NETWORK_COST * dremioCost.getNetwork() + dremioCost.getMemory()  * DremioCost.BASE_CPU_COST / DremioCost.MEMORY_TO_CPU_RATIO;
     }
 

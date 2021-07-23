@@ -24,17 +24,20 @@ import com.dremio.resource.exception.ResourceAllocationException;
 
 /**
  * Handles the life-cycle of query during the execution phases (post logical planning).
+ * 处理一个查询的执行阶段的什么周期
  */
 interface QueryTracker extends AutoCloseable {
 
   /**
    * Allocate resources required for the query (eg. slot in distributed queue).
+   * 申请资源
    * @throws ExecutionSetupException
    * @throws ResourceAllocationException
    */
   void allocateResources() throws ExecutionSetupException, ResourceAllocationException;
 
   /**
+   * // 查询片段
    * Execution planning include parallelization of the query fragments.
    * @throws ExecutionSetupException
    */
@@ -42,12 +45,14 @@ interface QueryTracker extends AutoCloseable {
 
   /**
    * Propagate the fragments to the executors.
+   * 将片段传播给执行器。
    * @throws ExecutionSetupException
    */
   void startFragments() throws ExecutionSetupException;
 
   /**
    * Handle completion of all fragments on given node.
+   * node 已经完成了
    * @param completion node completion.
    */
   void nodeCompleted(NodeQueryCompletion completion) throws RpcException;

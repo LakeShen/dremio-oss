@@ -24,6 +24,7 @@ import org.apache.calcite.rel.type.RelDataType;
 
 import com.dremio.exec.planner.common.WriterRelBase;
 
+// Dremio Rel
 public class WriterRel extends WriterRelBase implements Rel {
 
   private final RelDataType expectedInboundRowType;

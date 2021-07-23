@@ -44,7 +44,7 @@ public class RefreshTableHandler extends SimpleDirectHandler {
     final SqlRefreshTable sqlRefreshTable = SqlNodeUtil.unwrap(sqlNode, SqlRefreshTable.class);
 
     final NamespaceKey tableNSKey = catalog.resolveSingle(new NamespaceKey(sqlRefreshTable.getTable().names));
-
+    // 参数
     DatasetRetrievalOptions.Builder builder = DatasetRetrievalOptions.newBuilder();
     if (sqlRefreshTable.getDeleteUnavail().getValue() != null) {
       builder.setDeleteUnavailableDatasets(sqlRefreshTable.getDeleteUnavail().booleanValue());
@@ -72,7 +72,7 @@ public class RefreshTableHandler extends SimpleDirectHandler {
     default:
       throw new IllegalStateException();
     }
-
+    // 反射表
     return singletonList(successful(String.format(message, sqlRefreshTable.getTable().toString())));
   }
 }

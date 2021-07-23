@@ -44,6 +44,7 @@ public class WakeupHandler {
   }
 
   public Future<?> handle(String reason) {
+    // 反射manager 开始执行、
     logger.trace("waking up manager, reason: {}", reason);
     if (!wakeup.compareAndSet(false, true)) {
       return CompletableFuture.completedFuture(null);

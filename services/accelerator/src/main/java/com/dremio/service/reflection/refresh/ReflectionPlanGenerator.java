@@ -47,6 +47,7 @@ import com.google.common.collect.ImmutableList;
 
 /**
  * Encapsulates all the logic needed to generate a reflection's plan
+ * 封装生成反射计划所需的所有逻辑
  */
 class ReflectionPlanGenerator {
 
@@ -92,7 +93,7 @@ class ReflectionPlanGenerator {
   public RefreshDecision getRefreshDecision() {
     return refreshDecision;
   }
-
+  // 生成计划，获取归一化的执行逻辑计划
   public RelNode generateNormalizedPlan() {
 
     ReflectionPlanNormalizer planNormalizer = new ReflectionPlanNormalizer(
@@ -108,13 +109,14 @@ class ReflectionPlanGenerator {
     );
 
     // retrieve reflection's dataset
+    // 检索反射的数据集配置
     final DatasetConfig dataset = namespaceService.findDatasetByUUID(goal.getDatasetId());
     if (dataset == null) {
       throw new IllegalStateException(String.format("reflection %s has no corresponding dataset", ReflectionUtils.getId(goal)));
     }
     // generate dataset's plan and viewFieldTypes
     final NamespaceKey path = new NamespaceKey(dataset.getFullPathList());
-
+    // SqlSelect，转出 SqlSelect，本质是 SqlSelect，而且是比较简单，没有任何 where 和 groupby 参数
     SqlSelect select = new SqlSelect(
         SqlParserPos.ZERO,
         new SqlNodeList(SqlParserPos.ZERO),
@@ -130,6 +132,7 @@ class ReflectionPlanGenerator {
         );
 
     try {
+      // 转成 RelNode
       ConvertedRelNode converted = PrelTransformer.validateAndConvert(sqlHandlerConfig, select, planNormalizer);
 
       this.refreshDecision = planNormalizer.getRefreshDecision();

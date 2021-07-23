@@ -150,16 +150,20 @@ class ReflectionDetailsPopulatorImpl implements AccelerationDetailsPopulator {
     // not all datasets have acceleration settings
     return isPhysicalDataset(config.getType()) ? reflectionSettings.getReflectionSettings(datasetKey) : null;
   }
-
+  // 计算加速器
   @Override
   public byte[] computeAcceleration() {
     try {
       if (!consideredReflections.isEmpty()) {
+        // 反射关系
         List<ReflectionRelationship> relationships = Lists.newArrayList();
         for (final ReflectionState reflectionState : consideredReflections.values()) {
+          // 反射目标
           final Optional<ReflectionGoal> reflectionOptional = reflections.getGoal(new ReflectionId(reflectionState.reflectionId));
           if (reflectionOptional.isPresent()) {
+            // 反射目标
             final ReflectionGoal reflection = reflectionOptional.get();
+            // 物化描述
             final Optional<Materialization> materialization = reflections.getMaterialization(new MaterializationId(reflectionState.materializationId));
             final String materializationId;
             final long refreshChainStartTime;
@@ -179,9 +183,9 @@ class ReflectionDetailsPopulatorImpl implements AccelerationDetailsPopulator {
             if(datasetConfig == null) {
               continue;
             }
-
+            // 布局描述符
             final LayoutDescriptor layoutDescriptor = toLayoutDescriptor(reflection);
-
+            // 加速器设置
             final AccelerationSettings settings = getAccelerationSettings(datasetConfig);
 
             relationships.add(new ReflectionRelationship()
@@ -242,7 +246,7 @@ class ReflectionDetailsPopulatorImpl implements AccelerationDetailsPopulator {
     } finally {
       details.setErrorList(substitutionErrors);
     }
-
+    // 加速器物化细节
     return AccelerationDetailsUtils.serialize(details);
   }
 

@@ -80,7 +80,7 @@ public class DirectWriterCommand<T> implements CommandRunner<Object> {
   private final SqlDirectHandler<T> handler;
   private final QueryContext context;
   private final String sql;
-
+  // 反射表
   private List<T> result;
 
   public DirectWriterCommand(String sql, QueryContext context, SqlNode sqlNode,  SqlDirectHandler<T> handler, AttemptObserver observer) {
@@ -121,7 +121,9 @@ public class DirectWriterCommand<T> implements CommandRunner<Object> {
         BufferAllocator allocator = context.getAllocator().newChildAllocator("direct-writer", 0, Long.MAX_VALUE);
         VectorContainer vc = VectorContainer.create(allocator, schema);
         BufferManager manager = new BufferManagerImpl(allocator);
+        // 读数据？
         final PojoRecordReader<T> reader = new PojoRecordReader<>(handler.getResultType(), result.iterator());
+        // 这就是具体的算子了，具体的算子来执行
         SingleInputOperator op = registry.getSingleInputOperator(ocx, writer);
         ) {
       reader.setup(new VectorContainerMutator(vc, manager));
@@ -129,6 +131,7 @@ public class DirectWriterCommand<T> implements CommandRunner<Object> {
       int count = 0;
       while( (count = reader.next()) != 0){
         vc.setRecordCount(count);
+        // op 消费数据
         op.consumeData(count);
         depleteSend(op, output, listener);
       }

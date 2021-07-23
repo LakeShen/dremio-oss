@@ -55,6 +55,7 @@ public class HandlerToExec extends AsyncCommand {
 
   @Override
   public double plan() throws Exception {
+    // sql start
     observer.planStart(sql);
     physicalPlan = handler.getPlan(config, sql, sqlNode);
     return physicalPlan.getCost();

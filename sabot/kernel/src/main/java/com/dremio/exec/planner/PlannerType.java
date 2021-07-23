@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 public enum PlannerType {
   /**
    * Arbitrary heuristic, rules don't combine
+   * RBO
    */
   HEP(true, false, HepMatchOrder.ARBITRARY),
 

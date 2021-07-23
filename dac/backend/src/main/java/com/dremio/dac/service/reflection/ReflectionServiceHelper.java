@@ -36,6 +36,7 @@ import com.google.common.base.Optional;
  * Reflection service helper
  */
 public class ReflectionServiceHelper {
+  // 反射管理服务
   private final ReflectionAdministrationService reflectionAdministrationService;
   private final ReflectionStatusService reflectionStatusService;
 
@@ -67,6 +68,8 @@ public class ReflectionServiceHelper {
   }
 
   public ReflectionGoal createReflection(ReflectionGoal goal) {
+    // 存储反射
+    // 得到反射 ID，全局唯一
     ReflectionId id = reflectionAdministrationService.create(goal);
 
     return reflectionAdministrationService.getGoal(id).get();

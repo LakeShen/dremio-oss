@@ -470,7 +470,7 @@ public class ForemenWorkManager implements Service, SafeExit {
       try{
         // make sure we keep a local observer out of band.
         final QueryObserver oobJobObserver = new OutOfBandQueryObserver(observer, executor);
-
+        // 用户会话
         final UserSession session = UserSession.Builder.newBuilder()
           .withSessionOptionManager(new SessionOptionManagerImpl(options.getOptionValidatorListing()), options)
           .setSupportComplexTypes(true)

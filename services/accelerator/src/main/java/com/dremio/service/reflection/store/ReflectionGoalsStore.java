@@ -58,6 +58,7 @@ import com.google.common.collect.FluentIterable;
  * stores the reflection goals
  */
 public class ReflectionGoalsStore {
+  // 表名
   public static final String TABLE_NAME = "reflection_goals";
 
   private static final Function<Map.Entry<ReflectionId, ReflectionGoal>, ReflectionGoal> GET_VALUE =
@@ -89,6 +90,7 @@ public class ReflectionGoalsStore {
     // Invalidate the old tag, which might have been carried over from a version of Dremio
     // before the KVStore interface revisions (pre 4.2.0).
     goal.setVersion(null);
+    // key 为反射 goal 的 id 号，内容为 goal 的具体信息
     store.get().put(goal.getId(), goal);
   }
 

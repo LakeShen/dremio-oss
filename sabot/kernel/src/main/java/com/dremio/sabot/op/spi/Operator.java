@@ -69,6 +69,7 @@ public interface Operator extends AutoCloseable {
 
   /**
    * A type of operator that can output data.
+   * 一种能够输出数据的算子
    */
   interface Producer extends Operator {
 
@@ -81,6 +82,7 @@ public interface Operator extends AutoCloseable {
 
   /**
    * A type of operator that has a single stream of data as input.
+   * 单个流消费
    */
   interface SingleConsumer extends Operator {
 

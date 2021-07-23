@@ -79,7 +79,7 @@ public class NormalHandler implements SqlToPlanHandler {
           viewAccessEvaluator = new ViewAccessEvaluator(convertedRelWithExpansionNodes, config);
           config.getContext().getExecutorService().submit(viewAccessEvaluator);
         }
-
+        // 转换为 dremio 的查询
         final Rel drel = PrelTransformer.convertToDrel(config, queryRelNode, validatedRowType);
 
         final Pair<Prel, String> convertToPrel = PrelTransformer.convertToPrel(config, drel);
@@ -87,8 +87,10 @@ public class NormalHandler implements SqlToPlanHandler {
         textPlan = convertToPrel.getValue();
 
         //after we generate a physical plan, save it in the plan cache if plan cache is present
+        // 还是 cache 了物理执行计划
         if(plannerSettings.isPlanCacheEnabled() && planCache!= null && cachedPlans!= null) {
           cachedPlans.put(cachedKey, CachedPlan.createCachedPlan(sql, prel, prel.getEstimatedSize()));
+          // 所有 dremiotable
           Iterable<DremioTable> datasets = catalog.getAllRequestedTables();
           for (DremioTable dataset : datasets) {
             if (dataset instanceof NamespaceTable) {

@@ -70,6 +70,7 @@ public class AccelCreateReflectionHandler extends SimpleDirectHandler {
   @Override
   public List<SimpleCommandResult> toResult(String sql, SqlNode sqlNode) throws Exception {
     final SqlCreateReflection addLayout = SqlNodeUtil.unwrap(sqlNode, SqlCreateReflection.class);
+    // table with path
     final TableWithPath table = SchemaUtilities.verify(catalog, addLayout.getTblName());
     SqlIdentifier identifier = addLayout.getName();
     String name;

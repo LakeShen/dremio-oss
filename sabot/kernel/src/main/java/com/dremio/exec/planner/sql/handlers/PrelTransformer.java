@@ -181,9 +181,11 @@ public class PrelTransformer {
     if (config.getObserver() != null) {
       config.getObserver().beginState(AttemptObserver.toEvent(UserBitShared.AttemptEvent.State.PLANNING));
     }
-
+    // 验证的 sql
     final SqlNode validated = validatedTypedSqlNode.getKey();
+    // 转成 RelNode
     final RelNode rel = convertToRel(config, validated, relTransformer);
+    // 预处理的
     final RelNode preprocessedRel = preprocessNode(config, rel);
     return new ConvertedRelNode(preprocessedRel, validatedTypedSqlNode.getValue());
   }
@@ -230,14 +232,19 @@ public class PrelTransformer {
    * @return
    * @throws SqlUnsupportedException
    */
+  // 转成 Dremio 逻辑的关系表达式树
   public static Rel convertToDrel(SqlHandlerConfig config, final RelNode relNode) throws SqlUnsupportedException {
 
     try {
+      // planner 的配置
       final PlannerSettings plannerSettings = config.getContext().getPlannerSettings();
+      // 对空格进行了处理？
       final RelNode trimmed = trimFields(relNode, true, plannerSettings.isRelPlanningEnabled());
+      // 微词下推
       final RelNode projPush = transform(config, PlannerType.HEP_AC, PlannerPhase.PROJECT_PUSHDOWN, trimmed, trimmed.getTraitSet(), true);
       final RelNode preLog = transform(config, PlannerType.HEP_AC, PlannerPhase.PRE_LOGICAL, projPush, projPush.getTraitSet(), true);
       final RelNode preLogTransitive = getPreLogicalTransitive(config, preLog, plannerSettings);
+      // cbo 优化，还是逻辑计划阶段
       final RelNode logical = transform(config, PlannerType.VOLCANO, PlannerPhase.LOGICAL, preLogTransitive, preLogTransitive.getTraitSet().plus(Rel.LOGICAL), true);
       final RelNode rowCountAdjusted = getRowCountAdjusted(logical, plannerSettings);
       final RelNode postLogical = getPostLogical(config, rowCountAdjusted, plannerSettings);
@@ -246,14 +253,18 @@ public class PrelTransformer {
       final RelNode convertedRelNode = transform(config, PlannerType.HEP_BOTTOM_UP, PlannerPhase.JOIN_PLANNING_OPTIMIZATION, preConvertedRelNode, preConvertedRelNode.getTraitSet(), true);
       final RelNode flattendPushed = getFlattenedPushed(config, convertedRelNode);
       final Rel drel = (Rel) flattendPushed;
-
+      // 如果是 table sink
       if (drel instanceof TableModify) {
         throw new UnsupportedOperationException("TableModify " + drel);
       } else {
+        // 找到所有替换的信息
+        // 找到所有可用的物化信息
         final Optional<SubstitutionInfo> acceleration = findUsedMaterializations(config, drel);
+        // 如果有的话
         if (acceleration.isPresent()) {
           config.getObserver().planAccelerated(acceleration.get());
         }
+        // 返回 drel 优化后的 relnode
         return drel;
       }
     } catch (RelOptPlanner.CannotPlanException ex) {
@@ -271,6 +282,7 @@ public class PrelTransformer {
     if (plannerSettings.isTransitiveFilterPushdownEnabled()) {
       Stopwatch watch = Stopwatch.createStarted();
       final RelNode joinPullFilters = preLog.accept(new JoinPullTransitiveFiltersVisitor());
+      // RBO?
       log(PlannerType.HEP, PlannerPhase.TRANSITIVE_PREDICATE_PULLUP, joinPullFilters, logger, watch);
       config.getObserver().planRelTransform(PlannerPhase.TRANSITIVE_PREDICATE_PULLUP, null, preLog, joinPullFilters, watch.elapsed(TimeUnit.MILLISECONDS));
       return transform(config, PlannerType.HEP_AC, PlannerPhase.PRE_LOGICAL_TRANSITIVE, joinPullFilters, joinPullFilters.getTraitSet(), true);
@@ -344,6 +356,7 @@ public class PrelTransformer {
   }
 
   /**
+   * // 针对 select 语句，返回 dremio 查询计划
    * Return Dremio Logical RelNode tree for a SELECT statement, when it is executed / explained directly.
    *
    * @param relNode : root RelNode corresponds to Calcite Logical RelNode.
@@ -353,7 +366,7 @@ public class PrelTransformer {
    * @throws SqlUnsupportedException
    */
   public static Rel convertToDrel(SqlHandlerConfig config, RelNode relNode, RelDataType validatedRowType) throws RelConversionException, SqlUnsupportedException {
-
+    // 翻译为 dremio 的 逻辑执行计划，可以使用 反射来优化原来的查询计划
     Rel convertedRelNode = convertToDrel(config, relNode);
 
     final DremioFieldTrimmer trimmer = DremioFieldTrimmer.of(DremioRelFactories.LOGICAL_BUILDER.create(convertedRelNode.getCluster(), null));
@@ -364,6 +377,7 @@ public class PrelTransformer {
 
     trimmedRelNode = SqlHandlerUtil.storeQueryResultsIfNeeded(config.getConverter().getParserConfig(),
         config.getContext(), trimmedRelNode);
+    // screen
     return new ScreenRel(trimmedRelNode.getCluster(), trimmedRelNode.getTraitSet(), trimmedRelNode);
   }
 
@@ -374,21 +388,26 @@ public class PrelTransformer {
    * @param root plan root to inspect
    */
   private static Optional<SubstitutionInfo> findUsedMaterializations(SqlHandlerConfig config, final RelNode root) {
+    // 物化集合
     if (!config.getMaterializations().isPresent()) {
       return Optional.absent();
     }
 
     final SubstitutionInfo.Builder builder = SubstitutionInfo.builder();
-
+    // 物化信息
     final MaterializationList table = config.getMaterializations().get();
     root.accept(new StatelessRelShuttleImpl() {
       @Override
       public RelNode visit(final TableScan scan) {
+        // 物化描述符
         final Optional<MaterializationDescriptor> descriptor = table.getDescriptor(scan.getTable().getQualifiedName());
         if (descriptor.isPresent()) {
           // Always use metadataQuery from the cluster (do not use calcite's default CALCITE_INSTANCE)
+          // 优化消费
           final RelOptCost cost = scan.getCluster().getMetadataQuery().getCumulativeCost(scan);
+          // 聚合消耗
           final double acceleratedCost = DremioCost.aggregateCost(cost);
+          // 原始的消耗
           final double originalCost = descriptor.get().getOriginalCost();
           final double speedUp = originalCost/acceleratedCost;
           builder.addSubstitution(new SubstitutionInfo.Substitution(descriptor.get(), speedUp));
@@ -445,8 +464,17 @@ public class PrelTransformer {
     RelTraitSet targetTraits,
     boolean log
     ) {
+    // 规则集
     final RuleSet rules = config.getRules(phase);
+    //用来定义逻辑表的物理相关属性
     final RelTraitSet toTraits = targetTraits.simplify();
+    // 优化的 planner
+    //也就是优化器，Calcite 支持RBO（Rule-Based Optimizer） 和 CBO（Cost-Based Optimizer）。
+    // Calcite 的 RBO （HepPlanner）称为启发式优化器（heuristic implementation ），
+    // 它简单地按 AST 树结构匹配所有已知规则，直到没有规则能够匹配为止；
+    // Calcite 的 CBO 称为火山式优化器（VolcanoPlanner）成本优化器也会匹配并应用规则，
+    // 当整棵树的成本降低趋于稳定后，优化完成，成本优化器依赖于比较准确的成本估算。
+    // RelOptCost 和 Statistic 与成本估算相关；
     final RelOptPlanner planner;
     final Supplier<RelNode> toPlan;
     final PlannerSettings plannerSettings = config.getContext().getPlannerSettings();
@@ -456,9 +484,9 @@ public class PrelTransformer {
       CALCITE_LOGGER.trace("Completed Phase: {}. No rules.", phase);
       return input;
     }
-
+    // 如果 planer 是 CBO
     if(plannerType.isHep()) {
-
+      // CBO 优化器
       final HepProgramBuilder hepPgmBldr = new HepProgramBuilder();
 
       long relNodeCount = MoreRelOptUtil.countRelNodes(input);
@@ -479,6 +507,7 @@ public class PrelTransformer {
       }
 
       SqlConverter converter = config.getConverter();
+      // dremio CBO优化器
       final DremioHepPlanner hepPlanner = new DremioHepPlanner(hepPgmBldr.build(), plannerSettings, converter.getCostFactory(), phase, matchCountListener);
       hepPlanner.setExecutor(new ConstExecutor(converter.getFunctionImplementationRegistry(), converter.getFunctionContext(), converter.getSettings()));
 
@@ -509,17 +538,21 @@ public class PrelTransformer {
         return relNode;
       };
     } else {
+      // 如果是 CBO，
       // as weird as it seems, the cluster's only planner is the volcano planner.
       Preconditions.checkArgument(input.getCluster().getPlanner() instanceof DremioVolcanoPlanner,
           "Cluster is expected to be constructed using DremioVolcanoPlanner. Was actually of type %s.",
           input.getCluster().getPlanner().getClass().getName());
+      // dremio 的 CBO 优化器，也就是底层逻辑替换的地方。
       final DremioVolcanoPlanner volcanoPlanner = (DremioVolcanoPlanner) input.getCluster().getPlanner();
       volcanoPlanner.setPlannerPhase(phase);
       volcanoPlanner.setNoneConventionHaveInfiniteCost((phase != PlannerPhase.JDBC_PUSHDOWN) && (phase != PlannerPhase.RELATIONAL_PLANNING));
+      // 具体优化的项目
       final Program program = Programs.of(rules);
 
       final List<RelMetadataProvider> list = Lists.newArrayList();
       list.add(DefaultRelMetadataProvider.INSTANCE);
+      // 元数据
       volcanoPlanner.registerMetadataProviders(list);
 
       final RelMetadataProvider cachingMetaDataProvider = buildCachingRelMetadataProvider(
@@ -531,14 +564,18 @@ public class PrelTransformer {
       cluster.invalidateMetadataQuery();
 
       // Configure substitutions
+      // 配置加速器替换策略，本质还是使用已经有的反射的物化结果，来减少数据的处理和访问。
+      // converter
       final AccelerationAwareSubstitutionProvider substitutions = config.getConverter().getSubstitutionProvider();
       substitutions.setObserver(config.getObserver());
       substitutions.setEnabled(phase.useMaterializations);
+      // 替换策略，添加 dremio 侧能够替换的优化规则，也就是什么条件下，dremio 能够进行替换
       substitutions.setPostSubstitutionTransformer(getPostSubstitutionTransformer(config));
 
       planner = volcanoPlanner;
       toPlan = () -> {
         try {
+          // dremio CBO 优化器
           RelNode relNode = program.run(volcanoPlanner, input, toTraits, ImmutableList.of(), ImmutableList.of());
           if (log) {
             logger.debug("Phase: {}", phase);
@@ -555,11 +592,14 @@ public class PrelTransformer {
   }
 
   public static RelTransformer getPostSubstitutionTransformer(SqlHandlerConfig config) {
+    // transformer
     return relNode -> {
+      // 显示基于 RBO 来优化，各种规则，规则是确定的
       final HepProgramBuilder builder = HepProgram.builder();
       builder.addMatchOrder(HepMatchOrder.ARBITRARY);
+      // 添加优化规则
       builder.addRuleCollection(Lists.newArrayList(config.getRules(PlannerPhase.POST_SUBSTITUTION)));
-
+      //
       final HepProgram p = builder.build();
 
       final HepPlanner pl = new HepPlanner(p, config.getContext().getPlannerSettings());
@@ -610,11 +650,13 @@ public class PrelTransformer {
       throw t;
     }
   }
-
+  // 处理物化
   private static RelNode processBoostedMaterializations(SqlHandlerConfig config, RelNode relNode) {
+    //列名？所有已经物化的表？
     final Set<List<String>> qualifiedNames = config.getMaterializations().isPresent() ?
       config.getMaterializations().get().getMaterializations()
         .stream()
+        // arrow cache
         .filter(m -> m.getLayoutInfo().isArrowCachingEnabled())
         .map(DremioMaterialization::getTableRel)
         .map(rel -> {
@@ -631,6 +673,7 @@ public class PrelTransformer {
       return relNode.accept(new StatelessRelShuttleImpl() {
         @Override
         public RelNode visit(TableScan scan) {
+          // table scan
           if (scan instanceof FilesystemScanDrel) {
             FilesystemScanDrel scanDrel = (FilesystemScanDrel) scan;
             if (qualifiedNames.contains(scanDrel.getTable().getQualifiedName())) {
@@ -659,7 +702,7 @@ public class PrelTransformer {
 
   public static Pair<Prel, String> convertToPrel(SqlHandlerConfig config, RelNode drel) throws RelConversionException, SqlUnsupportedException {
     Preconditions.checkArgument(drel.getConvention() == Rel.LOGICAL);
-
+    // 物理集，trait 定义了 relnode 到其他 api 的转换，需要 conveter
     final RelTraitSet traits = drel.getTraitSet().plus(Prel.PHYSICAL).plus(DistributionTrait.SINGLETON);
     Prel phyRelNode;
     try {
@@ -1032,8 +1075,10 @@ public class PrelTransformer {
 
   private static RelNode convertToRel(SqlHandlerConfig config, SqlNode node, RelTransformer relTransformer) throws RelConversionException {
     RelNode rel;
+    //这次反射的元数据信息 catalog
     final Catalog catalog = config.getContext().getCatalog();
     try {
+      // 默认值为 true
       if (config.getContext().getPlannerSettings().isRelPlanningEnabled()) {
         rel = convertToRelRoot(config, node, relTransformer);
       } else {
@@ -1091,7 +1136,7 @@ public class PrelTransformer {
 
   private static Rel addRenamedProjectForMaterialization(SqlHandlerConfig config, Rel rel, RelDataType validatedRowType) {
     RelDataType relRowType = rel.getRowType();
-
+    // 重新进行 select 的选择？
     ProjectRel topProj = createRenameProjectRel(rel, validatedRowType);
 
     // Add a final non-trivial Project to get the validatedRowType

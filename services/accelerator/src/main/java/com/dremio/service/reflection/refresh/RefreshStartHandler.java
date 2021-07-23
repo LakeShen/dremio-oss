@@ -57,27 +57,33 @@ public class RefreshStartHandler {
   }
 
   public JobId startJob(ReflectionEntry entry, long jobSubmissionTime, OptionManager optionManager) {
-    // 放射 ID
+    // 反射 ID
     ReflectionId reflectionId = entry.getId();
-    // 物化 ID
+    // 物化 ID，创建一个 物化的 ID
     final MaterializationId id = new MaterializationId(UUID.randomUUID().toString());
     logger.debug("starting refresh for materialization {}/{}", reflectionId.getId(), id.getId());
     boolean icebergDataset = isIcebergDataset(optionManager);
+    // 物化信息，构建物化
     final Materialization materialization = new Materialization()
         .setId(id)
+        // 提交时间
         .setInitRefreshSubmit(jobSubmissionTime)
         .setState(MaterializationState.RUNNING)
         .setLastRefreshFromPds(0L)
         .setReflectionGoalVersion(entry.getGoalVersion())
         .setReflectionGoalHash(entry.getReflectionGoalHash())
         .setReflectionId(reflectionId)
+        // 是否 arrow 磁盘格式存储
         .setArrowCachingEnabled(entry.getArrowCachingEnabled())
         .setIsIcebergDataset(icebergDataset);
+    // iceberg?
     setIcebergReflectionAttributes(reflectionId, materialization, icebergDataset);
     // this is getting convoluted, but we need to make sure we save the materialization before we run the CTAS
     // as the MaterializedView will need it to extract the logicalPlan
+    // 逻辑视图
     materializationStore.save(materialization);
 
+    // 本质调用的 SQL 语句，通过 SQL
     final String sql = String.format("REFRESH REFLECTION '%s' AS '%s'", reflectionId.getId(), materialization.getId().getId());
 
     final JobId jobId = ReflectionUtils.submitRefreshJob(jobsService, namespaceService, entry, materialization, sql,

@@ -54,6 +54,7 @@ public class PojoRecordReader<T> extends AbstractRecordReader implements Iterabl
 
   private static final int DEFAULT_BATCH_SIZE  = BaseValueVector.INITIAL_VALUE_ALLOCATION;
   private final Class<T> pojoClass;
+  // 数据源
   private final List<T> pojoObjects;
   private PojoWriter[] writers;
   private T currentPojo;

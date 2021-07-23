@@ -179,6 +179,7 @@ public class ReflectionManager implements Runnable {
 
   @Override
   public void run() {
+    // 反射，默认 5 秒 Timer
     try (WarningTimer timer = new WarningTimer("Reflection Manager", TimeUnit.SECONDS.toMillis(5))) {
       logger.trace("running the reflection manager");
       try {
@@ -191,7 +192,9 @@ public class ReflectionManager implements Runnable {
 
   @VisibleForTesting
   void sync() {
+    // 现在唤醒的时间
     long lastWakeupTime = System.currentTimeMillis();
+    // 之前唤醒的时间
     final long previousLastWakeupTime = lastWakeupTime - WAKEUP_OVERLAP_MS;
     // updating the store's lastWakeupTime here. This ensures that if we're failing we don't do a denial of service attack
     // this assumes we properly handle exceptions for each goal/entry independently and we don't exit the loop before we
@@ -200,10 +203,15 @@ public class ReflectionManager implements Runnable {
     final long orphanThreshold = System.currentTimeMillis() - optionManager.getOption(MATERIALIZATION_ORPHAN_REFRESH) * 1000;
     final long deletionThreshold = System.currentTimeMillis() - deletionGracePeriod;
     final int numEntriesToDelete = (int) optionManager.getOption(REFLECTION_DELETION_NUM_ENTRIES);
+    // 处理 reflection 信息需要更新，比如编辑了信息？
     handleReflectionsToUpdate();
+    // 处理删除的数据集
     handleDeletedDatasets();
+    // 处理反射目标
     handleGoals(previousLastWakeupTime);
+    // 处理实体
     handleEntries();
+    // 删除物化视图
     deleteDeprecatedMaterializations(deletionThreshold, numEntriesToDelete);
     deprecateMaterializations();
     deleteDeprecatedGoals(deletionThreshold);
@@ -257,6 +265,7 @@ public class ReflectionManager implements Runnable {
       try {
         final ReflectionEntry entry = reflectionStore.get(rId);
         if (entry != null) {
+          // 取消反射 Job
           cancelRefreshJobIfAny(entry);
           entry.setState(UPDATE);
           reflectionStore.save(entry);
@@ -316,7 +325,7 @@ public class ReflectionManager implements Runnable {
    */
   private void handleEntries() {
     final long noDependencyRefreshPeriodMs = optionManager.getOption(ReflectionOptions.NO_DEPENDENCY_REFRESH_PERIOD_SECONDS) * 1000;
-
+    // 遍历每个反射实体
     Iterable<ReflectionEntry> entries = reflectionStore.find();
     final EntryCounts ec = new EntryCounts();
     for (ReflectionEntry entry : entries) {
@@ -353,8 +362,9 @@ public class ReflectionManager implements Runnable {
     private long active;
     private long unknown;
   }
-
+  // 处理每个反射实体
   private void handleEntry(ReflectionEntry entry, final long noDependencyRefreshPeriodMs, EntryCounts counts) {
+    // 反射的状态
     final ReflectionState state = entry.getState();
     switch (state) {
       case FAILED:
@@ -399,6 +409,7 @@ public class ReflectionManager implements Runnable {
 
   private void handleRefreshingEntry(final ReflectionEntry entry) {
     // handle job completion
+    // 物化？
     final Materialization m = Preconditions.checkNotNull(materializationStore.getLastMaterialization(entry.getId()),
       "Reflection in refreshing state has no materialization entries", entry.getId());
     if (m.getState() != MaterializationState.RUNNING) {
@@ -416,6 +427,7 @@ public class ReflectionManager implements Runnable {
 
     com.dremio.service.job.JobDetails job;
     try {
+      // 获取作业的 detail，也就是创建反射，本质也是创建执行的 job
       JobDetailsRequest request = JobDetailsRequest.newBuilder()
         .setJobId(JobsProtoUtil.toBuf(entry.getRefreshJobId()))
         .setUserName(SYSTEM_USERNAME)
@@ -437,11 +449,13 @@ public class ReflectionManager implements Runnable {
       // job not done yet
       return;
     }
+    // 一次 Job 执行
     JobAttempt lastAttempt = JobsProtoUtil.getLastAttempt(job);
     switch (lastAttempt.getState()) {
       case COMPLETED:
         try {
           logger.debug("job {} for materialization {} completed successfully", job.getJobId().getId(), getId(m));
+
           handleSuccessfulJob(entry, m, job);
         } catch (Exception e) {
           m.setState(MaterializationState.FAILED)
@@ -504,6 +518,7 @@ public class ReflectionManager implements Runnable {
    * @param lastWakeupTime previous wakeup time
    */
   private void handleGoals(long lastWakeupTime) {
+    // 获取所有已经编辑或者创建的反射
     Iterable<ReflectionGoal> goals = userStore.getModifiedOrCreatedSince(lastWakeupTime);
     for (ReflectionGoal goal : goals) {
       try {
@@ -551,14 +566,18 @@ public class ReflectionManager implements Runnable {
     if (entry == null) {
       // no corresponding reflection, goal has  been created or enabled
       if (goal.getState() == ReflectionGoalState.ENABLED) { // we still need to make sure user didn't create a disabled goal
+        // 反射存储
         reflectionStore.save(create(goal));
       }
     } else if (reflectionGoalChecker.isEqual(goal, entry)) {
+      // 没有变化，什么都不干
       return; //no changes, do nothing
-    } else if (reflectionGoalChecker.checkHash(goal, entry)) {
+    }
+    // 检查 hash 值
+    else if (reflectionGoalChecker.checkHash(goal, entry)) {
       // Check if entries need to update meta data that is not used in the materialization
       updateThatHasChangedEntry(goal, entry);
-
+      // 物化存储
       for (Materialization materialization : materializationStore.find(entry.getId())) {
         if (!Objects.equals(materialization.getArrowCachingEnabled(), goal.getArrowCachingEnabled())) {
           materializationStore.save(
@@ -585,7 +604,7 @@ public class ReflectionManager implements Runnable {
   private void updateThatHasChangedEntry(ReflectionGoal reflectionGoal, ReflectionEntry reflectionEntry) {
     boolean shouldBeUnstuck =
       reflectionGoal.getState() == ReflectionGoalState.ENABLED && reflectionEntry.getState() == FAILED;
-
+    // 反射存储
     reflectionStore.save(
       reflectionEntry
         .setArrowCachingEnabled(reflectionGoal.getArrowCachingEnabled())
@@ -686,7 +705,7 @@ public class ReflectionManager implements Runnable {
     if (entry.getState() != REFRESHING && entry.getState() != METADATA_REFRESH) {
       return;
     }
-
+    // 物化信息
     final Materialization m = Preconditions.checkNotNull(materializationStore.getLastMaterialization(entry.getId()),
       "reflection entry %s is in REFRESHING|METADATA_REFRESH state but has no materialization entry", entry.getId());
 
@@ -694,6 +713,7 @@ public class ReflectionManager implements Runnable {
       logger.debug("cancelling materialization job {} for reflection {}", entry.getRefreshJobId().getId(), getId(entry));
       // even though the following method can block if the job's foreman is on a different node, it's not a problem here
       // as we always submit reflection jobs on the same node as the manager
+      // 通过 Job Service 来进行作业操作的相关操作？
       jobsService.cancel(CancelJobRequest.newBuilder()
         .setUsername(SYSTEM_USERNAME)
         .setJobId(JobsProtoUtil.toBuf(entry.getRefreshJobId()))
@@ -942,6 +962,7 @@ public class ReflectionManager implements Runnable {
     reflectionStore.save(entry);
   }
 
+  // 刷新元数据
   private void refreshMetadata(ReflectionEntry entry, Materialization materialization) {
     final String sql = String.format("LOAD MATERIALIZATION METADATA \"%s\".\"%s\"",
       materialization.getReflectionId().getId(), materialization.getId().getId());
@@ -955,7 +976,7 @@ public class ReflectionManager implements Runnable {
 
     logger.debug("started job {} to load materialization metadata {}", jobId.getId(), getId(materialization));
   }
-
+  // 开始执行反射
   private void startRefresh(ReflectionEntry entry) {
     final long jobSubmissionTime = System.currentTimeMillis();
     // we should always update lastSubmittedRefresh to avoid an immediate refresh if we fail to start a refresh job
@@ -970,6 +991,7 @@ public class ReflectionManager implements Runnable {
     }
 
     try {
+      // 反射 job id，启动一个反射任务的 Job.
       final JobId refreshJobId = refreshStartHandler.startJob(entry, jobSubmissionTime, optionManager);
 
       entry.setState(REFRESHING)
